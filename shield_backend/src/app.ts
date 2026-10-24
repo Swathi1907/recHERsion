@@ -8,7 +8,7 @@ import { placesRouter } from "./routes/places.routes";
 import { routesRouter } from "./routes/routes.routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { HttpError } from "./utils/httpError";
-
+import { safetyRouter } from "./routes/safety.routes";
 export const app = express();
 
 app.disable("x-powered-by");
@@ -41,7 +41,7 @@ app.get("/", (_req, res) => {
 app.use("/api/health", healthRouter);
 app.use("/api/places", placesRouter);
 app.use("/api/routes", routesRouter);
-
+app.use("/api/safety", safetyRouter);
 app.use((_req, _res, next) => {
   next(new HttpError(404, "API endpoint not found."));
 });

@@ -26,6 +26,7 @@ export async function getDrivingRoutes(
   // OSRM coordinates are longitude,latitude (not latitude,longitude).
   const coordinates = `${start.longitude},${start.latitude};${destination.longitude},${destination.latitude}`;
   const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinates}`);
+  console.log("osrm call done")
   url.searchParams.set("overview", "full");
   url.searchParams.set("geometries", "geojson");
   url.searchParams.set("steps", "true");
