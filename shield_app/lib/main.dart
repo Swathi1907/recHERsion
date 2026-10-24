@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'features/safe_route/views/safe_route_page.dart';
+import 'features/evidence_vault/views/evidence_vault_page.dart';
 void main() {
   runApp(const ShieldApp());
 }
@@ -197,15 +198,25 @@ _toolCard(
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: _toolCard(
-                    context,
-                    Icons.security_rounded,
-                    'Digital shield',
-                    'Privacy tools',
-                    violet,
-                  ),
-                ),
+                
+Expanded(
+  child: _toolCard(
+    context,
+    Icons.lock_rounded,
+    'Evidence vault',
+    'Secure incidents',
+    violet,
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const EvidenceVaultPage(),
+        ),
+      );
+    },
+  ),
+),
+
               ],
             ),
             const SizedBox(height: 18),

@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 
 function positiveInteger(value: string | undefined, fallback: number): number {
@@ -15,7 +16,9 @@ export const env = {
   appUserAgent:
     process.env.APP_USER_AGENT ??
     "SHIELD-Safety-App/1.0 (replace-with-a-real-contact)",
-  requestTimeoutMs: positiveInteger(process.env.REQUEST_TIMEOUT_MS, 30000)
+  requestTimeoutMs: positiveInteger(process.env.REQUEST_TIMEOUT_MS, 30000),
+
+  // Supabase configuration
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
 };
-
-
