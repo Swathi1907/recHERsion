@@ -35,9 +35,11 @@ class SafeRouteViewModel extends ChangeNotifier {
       if (!_routes.any((route) => route.id == _selectedRouteId)) {
         _selectedRouteId = _routes.isEmpty ? '' : _routes.first.id;
       }
-    } catch (_) {
-      _errorMessage = 'Could not load routes. Please try again.';
-    } finally {
+    }  catch (e, stackTrace) {
+  debugPrint('SAFE ROUTE ERROR: $e');
+  debugPrintStack(stackTrace: stackTrace);
+  _errorMessage = 'Could not load routes: $e';
+} finally {
       _isLoading = false;
       notifyListeners();
     }

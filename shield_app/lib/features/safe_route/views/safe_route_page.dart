@@ -25,7 +25,7 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
   static const coral = Color(0xFFFF4D6A);
   static const muted = Color(0xFFB9A9D0);
 
-  static const baseUrl = 'http://172.22.20.117:3000';
+  static const baseUrl = 'http://172.22.21.45:3000';
 
   // Temporary coordinates: replace with phone GPS in the next step.
   static const double latitude = 23.7957;
@@ -264,8 +264,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
 
               final phone = place['phone']?.toString();
               final website = place['website']?.toString();
-              final openNow = place['openNow'] as bool?;
-              final hoursDisplay = place['hoursDisplay']?.toString();
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 9),
@@ -310,55 +308,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                               fontSize: 12,
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              Icon(
-                                openNow == true
-                                    ? Icons.check_circle
-                                    : openNow == false
-                                        ? Icons.cancel
-                                        : Icons.access_time,
-                                size: 15,
-                                color: openNow == true
-                                    ? Colors.greenAccent
-                                    : openNow == false
-                                        ? coral
-                                        : muted,
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  openNow == true
-                                      ? 'Open now'
-                                      : openNow == false
-                                          ? 'Closed now'
-                                          : 'Hours unavailable',
-                                  style: TextStyle(
-                                    color: openNow == true
-                                        ? Colors.greenAccent
-                                        : openNow == false
-                                            ? coral
-                                            : muted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (hoursDisplay != null &&
-                              hoursDisplay.isNotEmpty &&
-                              hoursDisplay != 'null') ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              hoursDisplay,
-                              style: const TextStyle(
-                                color: muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
                           const SizedBox(height: 3),
                           Text(
                             address,

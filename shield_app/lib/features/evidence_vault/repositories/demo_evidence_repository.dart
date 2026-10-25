@@ -27,4 +27,16 @@ class DemoEvidenceRepository implements EvidenceRepository {
   Future<void> addEvidence(EvidenceItem item) async {
     _items.insert(0, item);
   }
+    @override
+  Future<void> uploadEvidenceFile({
+    required String filePath,
+    required String title,
+    required EvidenceType type,
+    String? description,
+  }) async {
+    throw UnimplementedError(
+      'File uploads require ApiEvidenceRepository.',
+    );
+  }
+
 }

@@ -1,6 +1,5 @@
-
 import { Router, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
+import {createClient} from "@supabase/supabase-js"
 import type { Database } from "../types/database.types";
 import {
   requireAuth,
@@ -35,14 +34,21 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE,
     files: 1,
   },
-  fileFilter: (_req, file, callback) => {
-    if (!allowedMimeTypes[file.mimetype]) {
-      callback(new Error("Unsupported file type."));
-      return;
-    }
+fileFilter: (_req, file, callback) => {
+  console.log("[EVIDENCE UPLOAD] MIME type:", file.mimetype);
+  console.log("[EVIDENCE UPLOAD] Filename:", file.originalname);
 
-    callback(null, true);
-  },
+  if (!allowedMimeTypes[file.mimetype]) {
+    console.error(
+      "[EVIDENCE UPLOAD] Unsupported MIME type:",
+      file.mimetype,
+    );
+    callback(new Error("Unsupported file type."));
+    return;
+  }
+
+  callback(null, true);
+},
 });
 
 // Convert upload errors into appropriate HTTP errors.
@@ -78,7 +84,7 @@ function getUserSupabaseClient(token: string) {
   }
 
   return createClient<Database>(
-    env.supabaseUrl,
+   env.supabaseUrl,
     env.supabaseAnonKey,
     {
       auth: {
@@ -161,15 +167,22 @@ router.post(
 
       const parsed = createEvidenceSchema.safeParse(req.body);
 
-      if (!parsed.success) {
-        res.status(400).json({
-          success: false,
-          message: "Invalid evidence data.",
-          errors: parsed.error.flatten(),
-        });
-        return;
-      }
+     
+if (!parsed.success) {
+  console.error(
+    "[EVIDENCE POST] Validation failed:",
+    parsed.error.flatten()
+  );
 
+  res.status(400).json({
+    success: false,
+    message: "Invalid evidence data.",
+    errors: parsed.error.flatten(),
+  });
+  return;
+}
+
+console.log("[EVIDENCE POST] Validation passed");
       const authorization = req.headers.authorization;
 
       if (!authorization?.startsWith("Bearer ")) {
@@ -183,7 +196,7 @@ router.post(
       }
 
       const supabase = getUserSupabaseClient(token);
-
+console.log("[EVIDENCE POST] Inserting metadata into Supabase");
       const { data, error } = await supabase
         .from("evidence_items")
         .insert({
@@ -198,7 +211,10 @@ router.post(
           "id, title, evidence_type, description, sha256, captured_at, created_at, verification_status"
         )
         .single();
-
+console.log("[EVIDENCE POST] Insert completed:", {
+  hasData: Boolean(data),
+  hasError: Boolean(error),
+});
       if (error) {
         console.error("Evidence metadata insert failed:", error.message);
         throw new HttpError(500, "Unable to save evidence metadata.");
@@ -236,10 +252,20 @@ router.post(
           "Attach a file using the multipart field named 'file'."
         );
       }
+      console.log("[EVIDENCE POST] Request received");
+console.log("[EVIDENCE POST] Authenticated user:", req.userId);
+
       console.log("Upload form fields:", req.body);
       const title =
         typeof req.body?.title === "string" ? req.body.title.trim() : "";
-
+console.log("[EVIDENCE POST] Body:", {
+  title: req.body?.title,
+  evidence_type: req.body?.evidence_type,
+  descriptionLength:
+    typeof req.body?.description === "string"
+      ? req.body.description.length
+      : 0,
+});
       if (title.length < 1 || title.length > 200) {
         throw new HttpError(400, "Title must contain 1–200 characters.");
       }
@@ -297,7 +323,10 @@ router.post(
           contentType: mimeType,
           upsert: false,
         });
-
+console.log("[EVIDENCE UPLOAD] Storage upload finished", {
+  success: !uploadError,
+  error: uploadError?.message,
+});
       if (uploadError) {
         console.error("Evidence file upload failed:", uploadError.message);
         throw new HttpError(500, "Unable to upload the evidence file.");
@@ -317,7 +346,10 @@ router.post(
           "id, title, evidence_type, description, storage_path, sha256, created_at, verification_status"
         )
         .single();
-
+console.log("[EVIDENCE UPLOAD] Database insert finished", {
+  success: !insertError,
+  error: insertError?.message,
+});
       if (insertError) {
         console.error("Evidence metadata insert failed:", insertError.message);
 

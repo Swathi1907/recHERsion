@@ -1,7 +1,8 @@
-
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
-import '../repositories/demo_evidence_repository.dart';
+import '../models/evidence_item.dart';
+import '../repositories/api_evidence_repository.dart';
 import '../viewmodels/evidence_vault_viewmodel.dart';
 import '../widgets/evidence_item_card.dart';
 
@@ -21,12 +22,22 @@ class _EvidenceVaultPageState extends State<EvidenceVaultPage> {
 
   late final EvidenceVaultViewModel _viewModel;
 
-  @override
-  void initState() {
-    super.initState();
-    _viewModel = EvidenceVaultViewModel(DemoEvidenceRepository());
-    _viewModel.loadEvidence();
-  }
+ 
+@override
+void initState() {
+  super.initState();
+
+  debugPrint('EVIDENCE: Initializing API repository');
+
+  _viewModel = EvidenceVaultViewModel(
+    ApiEvidenceRepository(
+      baseUrl: 'http://172.22.21.45:3000',
+    ),
+  );
+
+  debugPrint('EVIDENCE: Loading saved records');
+  _viewModel.loadEvidence();
+}
 
   @override
   void dispose() {
@@ -43,6 +54,79 @@ class _EvidenceVaultPageState extends State<EvidenceVaultPage> {
       ),
     );
   }
+
+final ImagePicker _imagePicker = ImagePicker();
+bool _isUploadingPhoto = false;
+
+Future<void> _capturePhoto() async {
+  final source = await showModalBottomSheet<ImageSource>(
+    context: context,
+    backgroundColor: panel,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(
+              Icons.camera_alt,
+              color: Colors.white,
+            ),
+            title: const Text(
+              'Take a photo',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () =>
+                Navigator.pop(context, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.photo_library,
+              color: Colors.white,
+            ),
+            title: const Text(
+              'Choose from gallery',
+              style: TextStyle(color: Colors.white),
+            ),
+            onTap: () =>
+                Navigator.pop(context, ImageSource.gallery),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  if (source == null || !mounted) return;
+
+  try {
+    final image = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 90,
+    );
+
+    if (image == null || !mounted) return;
+
+    setState(() => _isUploadingPhoto = true);
+
+    await _viewModel.uploadEvidenceFile(
+      filePath: image.path,
+      title: 'Photo evidence ${DateTime.now().toIso8601String()}',
+      type: EvidenceType.photo,
+    );
+
+    if (mounted) {
+      _showMessage('Photo uploaded successfully.');
+    }
+  } catch (error) {
+    if (mounted) {
+      _showMessage('Photo upload failed: $error');
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isUploadingPhoto = false);
+    }
+  }
+}
+
 
   Future<void> _showNoteDialog() async {
     final titleController = TextEditingController();
@@ -102,7 +186,7 @@ class _EvidenceVaultPageState extends State<EvidenceVaultPage> {
 
                   if (mounted) {
                     _showMessage(
-                      'Note added to the demo list. The note body is not saved.',
+                      'Note saved successfully.',
                     );
                   }
                 } on ArgumentError catch (error) {
@@ -225,13 +309,11 @@ class _EvidenceVaultPageState extends State<EvidenceVaultPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: _captureButton(
-                              Icons.photo_camera_rounded,
-                              'Photo',
-                              () => _showMessage(
-                                'Photo capture is not connected yet.',
-                              ),
-                            ),
+                            child:_captureButton(
+  Icons.photo_camera_rounded,
+  _isUploadingPhoto ? 'Uploading...' : 'Photo',
+  _isUploadingPhoto ? () {} : _capturePhoto,
+),
                           ),
                           const SizedBox(width: 9),
                           Expanded(
@@ -365,8 +447,8 @@ class _EvidenceVaultPageState extends State<EvidenceVaultPage> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Prototype: records are sample data. No files are encrypted '
-                  'or exported by this screen.',
+                'Evidence is stored in your account. File capture and export '
+'are not connected yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: muted, fontSize: 10),
                 ),

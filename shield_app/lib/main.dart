@@ -1,8 +1,101 @@
 import 'package:flutter/material.dart';
 import 'features/safe_route/views/safe_route_page.dart';
 import 'features/evidence_vault/views/evidence_vault_page.dart';
-void main() {
-  runApp(const ShieldApp());
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'features/auth/views/auth_gate.dart';
+
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('SHIELD STARTUP: Flutter binding ready');
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('SHIELD FLUTTER ERROR: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      debugPrintStack(stackTrace: details.stack);
+    }
+  };
+
+  try {
+    debugPrint('SHIELD STARTUP: Loading .env');
+    await dotenv.load(fileName: '.env');
+    debugPrint('SHIELD STARTUP: .env loaded');
+
+    final supabaseUrl = dotenv.env['SUPABASE_URL'];
+    final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+    if (supabaseUrl == null || supabaseUrl.isEmpty ||
+        supabaseKey == null || supabaseKey.isEmpty) {
+      throw Exception('SUPABASE_URL or SUPABASE_ANON_KEY is missing in .env');
+    }
+
+    debugPrint('SHIELD STARTUP: Initializing Supabase');
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabaseKey,
+    );
+    debugPrint('SHIELD STARTUP: Supabase initialized');
+
+    // This app is configured to ask for login on each launch.
+    debugPrint('SHIELD STARTUP: Signing out previous session');
+    try {
+      await Supabase.instance.client.auth.signOut();
+      debugPrint('SHIELD STARTUP: Previous session signed out');
+    } catch (error, stackTrace) {
+      debugPrint('SHIELD SIGN-OUT ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    runApp(const ShieldApp());
+    debugPrint('SHIELD STARTUP: runApp called');
+  } catch (error, stackTrace) {
+    debugPrint('SHIELD STARTUP ERROR: $error');
+    debugPrintStack(stackTrace: stackTrace);
+    runApp(StartupErrorApp(error: error.toString()));
+  }
+}
+
+class StartupErrorApp extends StatelessWidget {
+  const StartupErrorApp({super.key, required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF6F2FF),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'SHIELD could not start',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(error, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Check the Flutter terminal for SHIELD STARTUP ERROR.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class ShieldApp extends StatelessWidget {
@@ -28,7 +121,7 @@ class ShieldApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const ShieldHomePage(),
+      home: const AuthGate(),
     );
   }
 }
@@ -155,23 +248,21 @@ class ShieldHomePage extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: 
-_toolCard(
-  context,
-  Icons.route_rounded,
-  'SafeRoute',
-  'Compare routes',
-  teal,
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const SafeRoutePage(),
-      ),
-    );
-  },
-),
-
+                  child: _toolCard(
+                    context,
+                    Icons.route_rounded,
+                    'SafeRoute',
+                    'Compare routes',
+                    teal,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SafeRoutePage(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -181,6 +272,20 @@ _toolCard(
                     'Evidence vault',
                     'Secure incidents',
                     violet,
+                    onTap: () async {
+                      debugPrint('SHIELD: Evidence Vault card tapped');
+                      try {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const EvidenceVaultPage(),
+                          ),
+                        );
+                      } catch (error, stackTrace) {
+                        debugPrint('SHIELD: Evidence Vault navigation error: $error');
+                        debugPrintStack(stackTrace: stackTrace);
+                      }
+                    },
                   ),
                 ),
               ],
@@ -198,25 +303,7 @@ _toolCard(
                   ),
                 ),
                 const SizedBox(width: 12),
-                
-Expanded(
-  child: _toolCard(
-    context,
-    Icons.lock_rounded,
-    'Evidence vault',
-    'Secure incidents',
-    violet,
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const EvidenceVaultPage(),
-        ),
-      );
-    },
-  ),
-),
-
+                const Expanded(child: SizedBox()),
               ],
             ),
             const SizedBox(height: 18),
