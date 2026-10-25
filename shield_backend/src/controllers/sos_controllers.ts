@@ -1,15 +1,16 @@
 
 import { Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { Database } from "../types/database.types";
+import type { Database } from "../types/database.types";
 import { env } from "../config/env";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { sendFcmNotification } from "../services/fcm.services";
 
 export async function createSosAlert(
   req: Request,
   res: Response,
   next: NextFunction
-) {
+): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.userId;
@@ -27,10 +28,7 @@ export async function createSosAlert(
       message,
     } = req.body ?? {};
 
-    if (
-      typeof sender_name !== "string" ||
-      sender_name.trim().length === 0
-    ) {
+    if (typeof sender_name !== "string" || !sender_name.trim()) {
       res.status(400).json({ error: "Sender name is required." });
       return;
     }
@@ -66,17 +64,21 @@ export async function createSosAlert(
       return;
     }
 
-    const supabase = createClient<Database>(
+    const userSupabase = createClient<Database>(
       env.supabaseUrl,
       env.supabaseAnonKey,
       {
         global: {
           headers: { Authorization: authorization },
         },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
       }
     );
 
-    const { data, error } = await supabase
+    const { data: alert, error } = await userSupabase
       .from("emergency_alerts")
       .insert({
         user_id: userId,
@@ -97,13 +99,72 @@ export async function createSosAlert(
       return;
     }
 
-    console.log("SOS ALERT CREATED:", data.id);
+    console.log("SOS ALERT CREATED:", alert.id);
+
+    let notificationResult = {
+      successCount: 0,
+      failureCount: 0,
+    };
+
+    try {
+      if (!env.supabaseServiceRoleKey) {
+        throw new Error("Supabase service-role key is not configured.");
+      }
+
+      const adminSupabase = createClient<Database>(
+        env.supabaseUrl,
+        env.supabaseServiceRoleKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
+
+      const { data: contacts, error: contactsError } = await adminSupabase
+        .from("trusted_contacts")
+        .select("contact_user_id")
+        .eq("user_id", userId)
+        .not("contact_user_id", "is", null);
+
+      if (contactsError) {
+        throw new Error(
+          `Could not load linked trusted contacts: ${contactsError.message}`
+        );
+      }
+
+      const recipientUserIds = [
+        ...new Set(
+          (contacts ?? [])
+            .map((contact) => contact.contact_user_id)
+            .filter((id): id is string => Boolean(id) && id !== userId)
+        ),
+      ];
+
+      if (recipientUserIds.length > 0) {
+        notificationResult = await sendFcmNotification({
+          userIds: recipientUserIds,
+          title: "SHIELD SOS ALERT",
+          body: `${alert.sender_name} has sent an emergency alert.`,
+          data: {
+            type: "SOS",
+            alertId: alert.id,
+          },
+        });
+      }
+    } catch (notificationError) {
+      console.error("SOS FCM notification failed:", notificationError);
+    }
+
+    const notificationsSent = notificationResult.successCount > 0;
 
     res.status(201).json({
       success: true,
       message: "SOS alert saved successfully.",
-      alert: data,
-      notificationsSent: false,
+      alert,
+      notificationsSent,
+      notificationResult,
     });
   } catch (error) {
     next(error);

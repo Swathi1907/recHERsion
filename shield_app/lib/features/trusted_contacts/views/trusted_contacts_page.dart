@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:share_plus/share_plus.dart';
 import '../models/trusted_contact.dart';
 import '../repositories/api_trusted_contacts_repository.dart';
 
@@ -54,6 +54,34 @@ class _TrustedContactsPageState extends State<TrustedContactsPage> {
     }
   }
 
+Future<void> _inviteContact(TrustedContact contact) async {
+  try {
+    final result = await _repository.inviteContact(contact.id);
+
+    if (!mounted) return;
+
+    final link = result['inviteLink']?.toString();
+
+    if (link == null || link.isEmpty) {
+      throw Exception('The server did not return an invitation link.');
+    }
+
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'You have been invited to join my SHIELD safety circle.\n\n'
+            'Open this invitation: $link',
+        subject: 'SHIELD trusted-contact invitation',
+      ),
+    );
+  } catch (error) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not create invitation: $error')),
+    );
+  }
+}
+
   Future<void> _addContact() async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
@@ -89,7 +117,7 @@ class _TrustedContactsPageState extends State<TrustedContactsPage> {
                     labelText: 'Phone number',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
-                  keyboardType: TextInputType.phone,
+                  keyboardType: TextInputType.text,
                   validator: (value) {
                     final phone = value?.trim() ?? '';
                     return phone.length < 7 || phone.length > 20
@@ -424,6 +452,17 @@ class _TrustedContactsPageState extends State<TrustedContactsPage> {
                               ),
                             ],
                           ),
+                          
+const SizedBox(height: 8),
+SizedBox(
+  width: double.infinity,
+  child: FilledButton.icon(
+    onPressed: () => _inviteContact(contact),
+    icon: const Icon(Icons.person_add_alt_1),
+    label: const Text('Invite to SHIELD'),
+  ),
+),
+
                         ],
                       ),
                     ),

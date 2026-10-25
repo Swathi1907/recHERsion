@@ -82,4 +82,25 @@ class ApiTrustedContactsRepository {
       throw Exception('Could not delete contact (${response.statusCode}).');
     }
   }
+  
+  Future<Map<String, dynamic>> inviteContact(String contactId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/trusted-contacts/$contactId/invite'),
+      headers: _headers(),
+      body: jsonEncode({}),
+    );
+
+    final decoded = jsonDecode(response.body);
+
+    if (response.statusCode != 201 || decoded['success'] != true) {
+      final message = decoded is Map<String, dynamic>
+          ? decoded['message']?.toString() ?? 'Could not create invitation.'
+          : 'Could not create invitation.';
+
+      throw Exception(message);
+    }
+
+    return Map<String, dynamic>.from(decoded as Map);
+  }
+
 }

@@ -1,5 +1,4 @@
-﻿
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -7,9 +6,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../widgets/route_map_card.dart';
 import '../repositories/api_safe_route_repository.dart';
-import '../repositories/api_safety_score_repository.dart';
 import '../viewmodels/safe_route_viewmodel.dart';
-import '../viewmodels/safety_score_viewmodel.dart';
 
 class SafeRoutePage extends StatefulWidget {
   const SafeRoutePage({super.key});
@@ -27,12 +24,11 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
 
   static const baseUrl = 'http://172.22.21.45:3000';
 
-  // Temporary coordinates: replace with phone GPS in the next step.
+  // Temporary coordinates; replace with phone GPS when ready.
   static const double latitude = 23.7957;
   static const double longitude = 86.4304;
 
   late final SafeRouteViewModel _viewModel;
-  late final SafetyScoreViewModel _safetyViewModel;
 
   String _category = 'all';
   bool _placesLoading = false;
@@ -50,23 +46,15 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
   @override
   void initState() {
     super.initState();
-
     _viewModel = SafeRouteViewModel(
       ApiSafeRouteRepository(baseUrl: baseUrl),
     );
-
-    _safetyViewModel = SafetyScoreViewModel(
-      ApiSafetyScoreRepository(baseUrl: baseUrl),
-    );
-
     _viewModel.loadRoutes();
-    _safetyViewModel.loadSafetyScore();
     _loadNearbyPlaces();
   }
 
   @override
   void dispose() {
-    _safetyViewModel.dispose();
     _viewModel.dispose();
     super.dispose();
   }
@@ -99,7 +87,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final results = data['places'] as List<dynamic>? ?? [];
-
       final places = results
           .whereType<Map<String, dynamic>>()
           .toList();
@@ -117,7 +104,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
         _placesError =
             'Could not load nearby places. Check your connection and retry.';
       });
-
       debugPrint('[Nearby Places] $error');
     } finally {
       if (mounted) {
@@ -151,7 +137,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
         value.contains('tea')) {
       return Icons.restaurant_outlined;
     }
-
     return Icons.storefront_outlined;
   }
 
@@ -180,13 +165,11 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
             style: TextStyle(color: muted, fontSize: 12),
           ),
           const SizedBox(height: 12),
-
           Wrap(
             spacing: 7,
             runSpacing: 7,
             children: _categories.entries.map((entry) {
               final selected = _category == entry.key;
-
               return ChoiceChip(
                 label: Text(entry.value),
                 selected: selected,
@@ -202,9 +185,7 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
               );
             }).toList(),
           ),
-
           const SizedBox(height: 12),
-
           if (_placesLoading)
             const Center(
               child: Padding(
@@ -244,7 +225,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
               ),
             ),
             const SizedBox(height: 6),
-
             ..._places.map((place) {
               final name = place['name']?.toString() ?? 'Unnamed place';
               final address =
@@ -430,13 +410,11 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                 style: TextStyle(color: muted, fontSize: 12),
               ),
               const SizedBox(height: 16),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: routes.map((route) {
                   final isSelected = route.id == selected.id;
-
                   return ChoiceChip(
                     label: Text(
                       '${route.title} · ${route.durationMinutes} min',
@@ -452,13 +430,13 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                 }).toList(),
               ),
               const SizedBox(height: 12),
-
               RouteMapCard(
                 fastest: false,
                 points: routePoints,
               ),
               const SizedBox(height: 12),
 
+              // Route details and hardcoded presentation-only score.
               Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
@@ -484,118 +462,36 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                       style: const TextStyle(color: muted, fontSize: 11),
                     ),
                     const SizedBox(height: 12),
-                    AnimatedBuilder(
-                      animation: _safetyViewModel,
-                      builder: (context, child) {
-                        if (_safetyViewModel.isLoading) {
-                          return const Row(
-                            children: [
-                              SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  color: teal,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Loading safety information...',
-                                style: TextStyle(color: muted, fontSize: 12),
-                              ),
-                            ],
-                          );
-                        }
-
-                        if (_safetyViewModel.errorMessage != null) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Safety information unavailable',
-                                style: TextStyle(
-                                  color: coral,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _safetyViewModel.errorMessage!,
-                                style: const TextStyle(
-                                  color: muted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              TextButton.icon(
-                                onPressed: _safetyViewModel.loadSafetyScore,
-                                icon: const Icon(Icons.refresh, size: 16),
-                                label: const Text('Retry'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: teal,
-                                  padding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ],
-                          );
-                        }
-
-                        final safety = _safetyViewModel.safetyScore;
-
-                        if (safety == null || !safety.hasScore) {
-                          return const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Safety score unavailable',
-                                style: TextStyle(
-                                  color: coral,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Verified safety indicators are not available '
-                                'yet. This route is not safety-rated.',
-                                style: TextStyle(color: muted, fontSize: 11),
-                              ),
-                            ],
-                          );
-                        }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Provisional safety indicator score: '
-                              '${safety.score}/100',
-                              style: const TextStyle(
-                                color: teal,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${safety.coveragePercent}% indicator coverage. '
-                              '${safety.message}',
-                              style: const TextStyle(
-                                color: muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                    const Text(
+                      'Safety score: 85/100',
+                      style: TextStyle(
+                        color: teal,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: const LinearProgressIndicator(
+                        value: 0.85,
+                        minHeight: 8,
+                        backgroundColor: Color(0xFF493263),
+                        valueColor: AlwaysStoppedAnimation<Color>(teal),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Demo score for presentation only. '
+                      'Not based on verified safety data.',
+                      style: TextStyle(color: muted, fontSize: 11),
                     ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
               _buildNearbyPlaces(),
-
               const SizedBox(height: 12),
-
               FilledButton.icon(
                 onPressed: () => _showMessage(
                   'Live location sharing is not implemented yet.',
@@ -609,7 +505,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                 ),
               ),
               const SizedBox(height: 8),
-
               OutlinedButton.icon(
                 onPressed: () => _showMessage(
                   'Reporting is not connected yet.',
@@ -623,7 +518,6 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                 ),
               ),
               const SizedBox(height: 10),
-
               const Text(
                 'Estimated driving route · Not emergency navigation',
                 textAlign: TextAlign.center,

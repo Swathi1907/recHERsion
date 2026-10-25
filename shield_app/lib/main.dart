@@ -5,10 +5,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'features/auth/views/auth_gate.dart';
 import 'features/trusted_contacts/views/trusted_contacts_page.dart';
+import 'features/digital_shield/views/digital_shield_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/services/foreground_notification_service.dart';
 import 'firebase_options.dart';
+import 'core/services/invitation_link_handler.dart';
+import 'core/services/invitation_link_service.dart';
 import 'features/sos/services/sos_services.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,7 +132,9 @@ class ShieldApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: const AuthGate(),
+     home: const InvitationLinkHandler(
+  child: AuthGate(),
+),
     );
   }
 }
@@ -299,47 +304,45 @@ class ShieldHomePage extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child:_toolCard(
-  context,
-  Icons.people_alt_rounded,
-  'Trusted circle',
-  'Your contacts',
-  teal,
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const TrustedContactsPage(),
+           Row(
+  children: [
+    Expanded(
+      child: _toolCard(
+        context,
+        Icons.people_alt_rounded,
+        'Trusted circle',
+        'Your contacts',
+        teal,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const TrustedContactsPage(),
+            ),
+          );
+        },
       ),
-    );
-  },
+    ),
+    const SizedBox(width: 12),
+   Expanded(
+  child: _toolCard(
+    context,
+    Icons.shield_rounded,
+    'SHIELD',
+    'Your safety protection',
+    violet,
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const DigitalShieldPage(),
+        ),
+      );
+    },
+  ),
 ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(child: SizedBox()),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Card(
-              color: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: Color(0xFFE6DEF7)),
-              ),
-              child: const ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Color(0x1414B8A6),
-                  child: Icon(Icons.timer_outlined, color: teal),
-                ),
-                title: Text('Safety check-in'),
-                subtitle: Text('Set a timer for your journey'),
-                trailing: Icon(Icons.chevron_right_rounded),
-              ),
-            ),
+  ],
+),
           ],
         ),
       ),
