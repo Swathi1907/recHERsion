@@ -7,6 +7,7 @@ import 'features/auth/views/auth_gate.dart';
 import 'features/trusted_contacts/views/trusted_contacts_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'core/services/foreground_notification_service.dart';
 import 'firebase_options.dart';
 import 'features/sos/services/sos_services.dart';
 Future<void> main() async {
@@ -14,6 +15,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
   options: DefaultFirebaseOptions.currentPlatform,
 );
+await ForegroundNotificationService.initialize();
   debugPrint('SHIELD STARTUP: Flutter binding ready');
 
   FlutterError.onError = (FlutterErrorDetails details) {

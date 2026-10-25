@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Database } from "../types/database.types";
 import { env } from "../config/env";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
-
+import { firebaseMessaging } from "../config/firebase";
 export async function registerDeviceToken(
   req: Request,
   res: Response,
@@ -137,3 +137,77 @@ export async function deleteDeviceToken(
     next(error);
   }
 }
+export async function sendTestNotification(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.userId;
+
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required." });
+      return;
+    }
+
+    const authorization = req.headers.authorization;
+
+    if (!authorization?.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Authentication token missing." });
+      return;
+    }
+
+    const supabase = createClient<Database>(
+      env.supabaseUrl,
+      env.supabaseAnonKey,
+      {
+        global: {
+          headers: { Authorization: authorization },
+        },
+      }
+    );
+
+    const { data: devices, error } = await supabase
+      .from("device_tokens")
+      .select("fcm_token")
+      .eq("user_id", userId);
+
+    if (error) {
+      next(error);
+      return;
+    }
+
+    if (!devices || devices.length === 0) {
+      res.status(404).json({
+        error: "No FCM device tokens found for this user.",
+      });
+      return;
+    }
+
+    const result = await firebaseMessaging.sendEachForMulticast({
+      tokens: devices.map((device) => device.fcm_token),
+      notification: {
+        title: "SHIELD Test Notification",
+        body: "Your push notifications are connected successfully!",
+      },
+      data: {
+        type: "FCM_TEST",
+      },
+    });
+
+    res.status(200).json({
+      message: "Test notification request completed.",
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+      responses: result.responses.map((response) => ({
+        success: response.success,
+        error: response.error?.code ?? null,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+

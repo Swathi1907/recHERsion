@@ -4,3 +4,4 @@ dist/
 *.log
 .DS_Store
 coverage/
+shield_backend/src/config/shield-service-account.json
