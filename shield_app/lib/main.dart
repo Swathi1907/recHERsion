@@ -4,10 +4,16 @@ import 'features/evidence_vault/views/evidence_vault_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'features/auth/views/auth_gate.dart';
-
-
+import 'features/trusted_contacts/views/trusted_contacts_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'firebase_options.dart';
+import 'features/sos/services/sos_services.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
   debugPrint('SHIELD STARTUP: Flutter binding ready');
 
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -294,13 +300,21 @@ class ShieldHomePage extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: _toolCard(
-                    context,
-                    Icons.people_alt_rounded,
-                    'Trusted circle',
-                    'Your contacts',
-                    teal,
-                  ),
+                  child:_toolCard(
+  context,
+  Icons.people_alt_rounded,
+  'Trusted circle',
+  'Your contacts',
+  teal,
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TrustedContactsPage(),
+      ),
+    );
+  },
+),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(child: SizedBox()),
@@ -405,27 +419,73 @@ Widget _toolCard(
 }
 
 
-  void _showSosDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Emergency SOS'),
-        content: const Text(
-          'This is a prototype. No contacts or emergency services will '
-          'be notified yet. Real SOS requires location permissions and '
-          'a configured backend.',
+  
+Future<void> _showSosDialog(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Emergency SOS'),
+      content: const Text(
+        'Are you sure you want to send an emergency alert?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Got it'),
-          ),
-        ],
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('Send SOS'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) return;
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text('Sending SOS...')),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  try {
+    final result = await SosService.createAlert(
+      senderName: 'SHIELD User',
+      message: 'Emergency! I need help.',
+    );
+
+    if (!context.mounted) return;
+
+    Navigator.of(context, rootNavigator: true).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message']?.toString() ?? 'SOS alert saved.',
+        ),
       ),
     );
+  } catch (error) {
+    if (!context.mounted) return;
+
+    Navigator.of(context, rootNavigator: true).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('SOS failed: $error')),
+    );
   }
+}
+
 }

@@ -10,8 +10,10 @@ import { errorHandler } from "./middleware/errorHandler";
 import { HttpError } from "./utils/httpError";
 import { safetyRouter } from "./routes/safety.routes";
 import evidenceRoutes from "./routes/evidence.routes";
+import sosRoutes from "./routes/sos.routes";
 export const app = express();
-
+import deviceTokensRoutes from "./routes/deviceTokens.routes";
+import trustedContactsRoutes from "./routes/trustedContacts.routes";
 app.disable("x-powered-by");
 app.use(helmet());
 
@@ -38,7 +40,9 @@ app.use("/api", rateLimit({
 app.get("/", (_req, res) => {
   res.json({ name: "SHIELD API", status: "running", health: "/api/health" });
 });
-
+app.use("/api/sos", sosRoutes);
+app.use("/api/device-tokens", deviceTokensRoutes);
+app.use("/api/trusted-contacts", trustedContactsRoutes);
 app.use("/api/health", healthRouter);
 app.use("/api/places", placesRouter);
 app.use("/api/routes", routesRouter);
