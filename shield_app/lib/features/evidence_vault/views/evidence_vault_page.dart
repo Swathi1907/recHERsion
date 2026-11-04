@@ -31,7 +31,7 @@ void initState() {
 
   _viewModel = EvidenceVaultViewModel(
     ApiEvidenceRepository(
-      baseUrl: 'http://172.22.21.45:3000',
+      baseUrl:   'http://172.22.21.254:3000',
     ),
   );
 

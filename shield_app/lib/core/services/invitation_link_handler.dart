@@ -18,6 +18,7 @@ class InvitationLinkHandler extends StatefulWidget {
 
 class _InvitationLinkHandlerState
     extends State<InvitationLinkHandler> {
+
   @override
   void initState() {
     super.initState();
@@ -39,20 +40,22 @@ class _InvitationLinkHandlerState
   }
 
   void _handleToken(String token) {
+    InvitationLinkService.savePendingToken(token);
+
     if (!mounted) return;
 
-    // Temporary confirmation. Next, we'll pass the token
-    // to the authenticated invitation-acceptance screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invitation link received by SHIELD.'),
+          content: Text(
+            'Invitation received! Please log in to continue.',
+          ),
         ),
       );
 
-      debugPrint('SHIELD: Invitation token received');
+      debugPrint('SHIELD: Invitation token saved');
     });
   }
 

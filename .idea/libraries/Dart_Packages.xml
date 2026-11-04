@@ -723,6 +723,20 @@
             </list>
           </value>
         </entry>
+        <entry key="share_plus">
+          <value>
+            <list>
+              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus-13.3.1/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="share_plus_platform_interface">
+          <value>
+            <list>
+              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus_platform_interface-7.2.0/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="shared_preferences">
           <value>
             <list>
@@ -1127,6 +1141,8 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/pub_semver-2.2.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/realtime_client-2.13.2/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/record_use-0.6.0/lib" />
+      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus-13.3.1/lib" />
+      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/share_plus_platform_interface-7.2.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences-2.5.6/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_android-2.5.3/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/shared_preferences_foundation-2.5.7/lib" />

@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SosService {
-  static const String baseUrl = 'http://172.22.21.45:3000';
+  static const String baseUrl = 'http://172.22.21.254:3000';
 
   static Future<Map<String, dynamic>> createAlert({
     required String senderName,

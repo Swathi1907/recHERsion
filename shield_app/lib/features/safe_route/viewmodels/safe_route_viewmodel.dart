@@ -1,4 +1,5 @@
-﻿import 'package:flutter/foundation.dart';
+﻿
+import 'package:flutter/foundation.dart';
 
 import '../models/route_option.dart';
 import '../repositories/safe_route_repository.dart';
@@ -25,21 +26,32 @@ class SafeRouteViewModel extends ChangeNotifier {
     return _routes.isEmpty ? null : _routes.first;
   }
 
-  Future<void> loadRoutes() async {
+  Future<void> loadRoutes({
+    required double startLat,
+    required double startLon,
+    required double endLat,
+    required double endLon,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _routes = await _repository.getRoutes();
+      _routes = await _repository.getRoutes(
+        startLat: startLat,
+        startLon: startLon,
+        endLat: endLat,
+        endLon: endLon,
+      );
+
       if (!_routes.any((route) => route.id == _selectedRouteId)) {
         _selectedRouteId = _routes.isEmpty ? '' : _routes.first.id;
       }
-    }  catch (e, stackTrace) {
-  debugPrint('SAFE ROUTE ERROR: $e');
-  debugPrintStack(stackTrace: stackTrace);
-  _errorMessage = 'Could not load routes: $e';
-} finally {
+    } catch (e, stackTrace) {
+      debugPrint('SAFE ROUTE ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
+      _errorMessage = 'Could not load routes: $e';
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
@@ -47,6 +59,7 @@ class SafeRouteViewModel extends ChangeNotifier {
 
   void selectRoute(String routeId) {
     if (!_routes.any((route) => route.id == routeId)) return;
+
     _selectedRouteId = routeId;
     notifyListeners();
   }

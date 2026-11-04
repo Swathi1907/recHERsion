@@ -5,6 +5,19 @@ import 'package:flutter/foundation.dart';
 class InvitationLinkService {
   static const _channel = MethodChannel('shield/invitation_links');
 
+  static final ValueNotifier<String?> pendingToken =
+      ValueNotifier<String?>(null);
+
+  static void savePendingToken(String token) {
+    pendingToken.value = token;
+  }
+
+  static String? consumePendingToken() {
+    final token = pendingToken.value;
+    pendingToken.value = null;
+    return token;
+  }
+
   static Future<String?> getInitialLink() async {
     try {
       return await _channel.invokeMethod<String>('getInitialLink');
@@ -20,15 +33,9 @@ class InvitationLinkService {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onInvitationLink') {
         final link = call.arguments as String?;
-        if (link == null) return;
+        final token = tokenFromLink(link);
 
-        final uri = Uri.tryParse(link);
-        final token = uri?.queryParameters['token'];
-
-        if (uri?.scheme == 'shield' &&
-            uri?.host == 'invite' &&
-            token != null &&
-            token.isNotEmpty) {
+        if (token != null) {
           onInvitationToken(token);
         }
       }
@@ -39,11 +46,13 @@ class InvitationLinkService {
     if (link == null) return null;
 
     final uri = Uri.tryParse(link);
+
     if (uri?.scheme != 'shield' || uri?.host != 'invite') {
       return null;
     }
 
     final token = uri?.queryParameters['token'];
+
     return token == null || token.isEmpty ? null : token;
   }
 }

@@ -103,4 +103,29 @@ class ApiTrustedContactsRepository {
     return Map<String, dynamic>.from(decoded as Map);
   }
 
+Future<Map<String, dynamic>> acceptInvitation(String token) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl/api/trusted-contacts/invitations/accept'),
+    headers: _headers(),
+    body: jsonEncode({
+      'token': token,
+    }),
+  );
+
+  final decoded = jsonDecode(response.body);
+
+  if (response.statusCode != 200 ||
+      decoded is! Map<String, dynamic> ||
+      decoded['success'] != true) {
+    final message = decoded is Map<String, dynamic>
+        ? decoded['message']?.toString() ??
+            'Could not accept invitation.'
+        : 'Could not accept invitation.';
+
+    throw Exception(message);
+  }
+
+  return decoded;
+}
+
 }

@@ -3,7 +3,12 @@ import 'safe_route_repository.dart';
 
 class DemoSafeRouteRepository implements SafeRouteRepository {
   @override
-  Future<List<RouteOption>> getRoutes() async {
+  Future<List<RouteOption>> getRoutes({
+     required double startLat,
+  required double startLon,
+  required double endLat,
+  required double endLon,
+  }) async {
     // Temporary demonstration data, not real navigation results.
     return const [
       RouteOption(

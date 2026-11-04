@@ -256,9 +256,7 @@ Plan trip ─▶ Pick safest route ─▶ Live share ON
 
 ---
 
-## 📄 License
 
-This project is built for a hackathon. Licensed under the [MIT License](LICENSE).
 
 ---
 

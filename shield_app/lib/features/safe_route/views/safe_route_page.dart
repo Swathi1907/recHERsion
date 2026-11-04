@@ -1,9 +1,10 @@
 ﻿import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/services/location_service.dart';
+import 'dart:async';
 import '../widgets/route_map_card.dart';
 import '../repositories/api_safe_route_repository.dart';
 import '../viewmodels/safe_route_viewmodel.dart';
@@ -22,14 +23,21 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
   static const coral = Color(0xFFFF4D6A);
   static const muted = Color(0xFFB9A9D0);
 
-  static const baseUrl = 'http://172.22.21.45:3000';
+  static const baseUrl = 'http://172.22.21.254:3000';
+final TextEditingController _destinationController =
+    TextEditingController();
 
+Timer? _searchDebounce;
+
+bool _searchLoading = false;
+String? _searchError;
+
+List<Map<String, dynamic>> _destinationSuggestions = [];
+
+Map<String, dynamic>? _selectedDestination;
   // Temporary coordinates; replace with phone GPS when ready.
-  static const double latitude = 23.7957;
-  static const double longitude = 86.4304;
-
   late final SafeRouteViewModel _viewModel;
-
+String _currentLocationName = 'My Current Location';
   String _category = 'all';
   bool _placesLoading = false;
   String? _placesError;
@@ -49,17 +57,90 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
     _viewModel = SafeRouteViewModel(
       ApiSafeRouteRepository(baseUrl: baseUrl),
     );
-    _viewModel.loadRoutes();
-    _loadNearbyPlaces();
+    
+_loadNearbyPlaces();
   }
 
   @override
-  void dispose() {
-    _viewModel.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _searchDebounce?.cancel();
+  _destinationController.dispose();
+  _viewModel.dispose();
+  super.dispose();
+}
+void _onDestinationChanged(String value) {
+  _searchDebounce?.cancel();
 
-  Future<void> _loadNearbyPlaces({String? category}) async {
+  setState(() {
+    _selectedDestination = null;
+    _destinationSuggestions = [];
+    _searchError = null;
+  });
+
+  if (value.trim().length < 3) return;
+
+  _searchDebounce = Timer(
+    const Duration(seconds: 1),
+    () => _searchDestinations(value.trim()),
+  );
+}
+
+Future<void> _searchDestinations(String query) async {
+  setState(() {
+    _searchLoading = true;
+    _searchError = null;
+  });
+
+  try {
+    final uri = Uri.parse('$baseUrl/api/routes/search').replace(
+      queryParameters: {'query': query},
+    );
+
+    final response = await http.get(uri).timeout(
+      const Duration(seconds: 15),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Search failed: ${response.statusCode}');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final results = data['destinations'] as List<dynamic>? ?? [];
+
+    if (!mounted) return;
+
+    setState(() {
+      _destinationSuggestions = results
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    });
+  } catch (error) {
+    if (!mounted) return;
+
+    setState(() {
+      _searchError = 'Could not search destinations. Please try again.';
+    });
+
+    debugPrint('[Destination Search] Error: $error');
+  } finally {
+    if (mounted) {
+      setState(() => _searchLoading = false);
+    }
+  }
+}
+void _selectDestination(Map<String, dynamic> destination) {
+  FocusScope.of(context).unfocus();
+
+  setState(() {
+    _selectedDestination = destination;
+    _destinationSuggestions = [];
+    _destinationController.text =
+        destination['name']?.toString() ?? '';
+  });
+
+  _loadRoutes(destination: destination);
+}
+ Future<void> _loadNearbyPlaces({String? category}) async {
     final requestedCategory = category ?? _category;
 
     setState(() {
@@ -68,21 +149,38 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
     });
 
     try {
+      // Use the phone's actual GPS location.
+      final position = await LocationService().getCurrentLocation();
+      final latitude = position.latitude;
+      final longitude = position.longitude;
+      const radiusMeters = 1000;
+
       final uri = Uri.parse('$baseUrl/api/places/nearby').replace(
         queryParameters: {
-          'latitude': '$latitude',
-          'longitude': '$longitude',
-          'radiusMeters': '1000',
+          'latitude': latitude.toString(),
+          'longitude': longitude.toString(),
+          'radiusMeters': radiusMeters.toString(),
           'category': requestedCategory,
         },
       );
+
+      debugPrint('========== NEARBY PLACES DEBUG ==========');
+      debugPrint('[Nearby] Request URL: $uri');
+      debugPrint('[Nearby] Actual GPS coordinates: $latitude, $longitude');
+      debugPrint('[Nearby] Radius: $radiusMeters metres');
+      debugPrint('[Nearby] Category: $requestedCategory');
 
       final response = await http
           .get(uri)
           .timeout(const Duration(seconds: 15));
 
+      debugPrint('[Nearby] HTTP status: ${response.statusCode}');
+      debugPrint('[Nearby] Raw response: ${response.body}');
+
       if (response.statusCode != 200) {
-        throw Exception('Request failed (${response.statusCode})');
+        throw Exception(
+          'Nearby API failed: HTTP ${response.statusCode} - ${response.body}',
+        );
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -91,23 +189,106 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
           .whereType<Map<String, dynamic>>()
           .toList();
 
+      debugPrint('[Nearby] Places received: ${places.length}');
+      if (places.isNotEmpty) {
+        debugPrint('[Nearby] First place: ${places.first['name']}');
+        debugPrint('[Nearby] First address: ${places.first['address']}');
+      }
+      debugPrint('=========================================');
+
       if (!mounted) return;
 
       setState(() {
         _category = requestedCategory;
         _places = places;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('[Nearby] ERROR: $error');
+      debugPrint('[Nearby] STACK TRACE: $stackTrace');
+
       if (!mounted) return;
 
       setState(() {
         _placesError =
             'Could not load nearby places. Check your connection and retry.';
       });
-      debugPrint('[Nearby Places] $error');
     } finally {
       if (mounted) {
         setState(() => _placesLoading = false);
+      }
+    }
+  }
+
+ Future<void> _loadRoutes({
+  Map<String, dynamic>? destination,
+}) async {
+    try {
+      // Use the phone's actual GPS location as the route origin.
+      final position = await LocationService().getCurrentLocation();
+      if (!mounted) return;
+
+      final startLat = position.latitude;
+      final startLon = position.longitude;
+
+      // Current fixed destination: Bank More, Dhanbad.
+      // Replace these with user-selected destination coordinates when
+      // destination search is implemented.
+      if (destination == null) {
+  _showMessage('Please select a destination first.');
+  return;
+}
+
+final endLat = (destination['latitude'] as num).toDouble();
+final endLon = (destination['longitude'] as num).toDouble();
+
+      debugPrint('\\n========== SAFEROUTE DEBUG ==========');
+      debugPrint('[SafeRoute] API base URL: $baseUrl');
+      debugPrint('[SafeRoute] Actual GPS start: $startLat, $startLon');
+     debugPrint(
+  '[SafeRoute] Destination: ${destination['name']} '
+  '($endLat, $endLon)',
+);
+      debugPrint('[SafeRoute] Calling ViewModel.loadRoutes...');
+
+      await _viewModel.loadRoutes(
+        startLat: startLat,
+        startLon: startLon,
+        endLat: endLat,
+        endLon: endLon,
+      );
+
+      debugPrint('[SafeRoute] ViewModel call completed.');
+      debugPrint('[SafeRoute] Error: ${_viewModel.errorMessage}');
+      debugPrint('[SafeRoute] Routes received: ${_viewModel.routes.length}');
+
+      for (final route in _viewModel.routes) {
+        debugPrint(
+          '[SafeRoute] Route ${route.id}: '
+          '${route.distanceKm} km, ${route.durationMinutes} min',
+        );
+        debugPrint(
+          '[SafeRoute] ${route.id} coordinate count: '
+          '${route.coordinates.length}',
+        );
+        if (route.coordinates.isNotEmpty) {
+          debugPrint(
+            '[SafeRoute] ${route.id} FIRST coordinate [lat, lon]: '
+            '${route.coordinates.first}',
+          );
+          debugPrint(
+            '[SafeRoute] ${route.id} LAST coordinate [lat, lon]: '
+            '${route.coordinates.last}',
+          );
+        }
+      }
+
+      debugPrint('====================================\\n');
+    } catch (error, stackTrace) {
+      debugPrint('[SafeRoute] ERROR: $error');
+      debugPrint('[SafeRoute] STACK TRACE: $stackTrace');
+
+      if (mounted) {
+        _showMessage('Could not load route: $error');
       }
     }
   }
@@ -139,7 +320,117 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
     }
     return Icons.storefront_outlined;
   }
+Widget _buildDestinationSearch() {
+  return Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: panel,
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: const Color(0xFF493263)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Where do you want to go?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 10),
 
+        TextField(
+          controller: _destinationController,
+          onChanged: _onDestinationChanged,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search destination...',
+            hintStyle: const TextStyle(color: muted),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: teal,
+            ),
+            suffixIcon: _destinationController.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close, color: muted),
+                    onPressed: () {
+                      _destinationController.clear();
+                      setState(() {
+                        _selectedDestination = null;
+                        _destinationSuggestions = [];
+                        _searchError = null;
+                      });
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: bg,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+
+        if (_searchLoading) ...[
+          const SizedBox(height: 10),
+          const LinearProgressIndicator(color: teal),
+        ],
+
+        if (_searchError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _searchError!,
+            style: const TextStyle(color: coral, fontSize: 12),
+          ),
+        ],
+
+        if (_destinationSuggestions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ..._destinationSuggestions.map((destination) {
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                Icons.location_on_outlined,
+                color: teal,
+              ),
+              title: Text(
+                destination['name']?.toString() ?? 'Unknown place',
+                style: const TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                destination['address']?.toString() ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: muted, fontSize: 11),
+              ),
+              onTap: () => _selectDestination(destination),
+            );
+          }),
+        ],
+
+        if (_selectedDestination != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: teal, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Destination selected: '
+                  '${_selectedDestination!['name']}',
+                  style: const TextStyle(color: teal, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    ),
+  );
+}
   Widget _buildNearbyPlaces() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -335,67 +626,57 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+ 
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: bg,
+    appBar: AppBar(
       backgroundColor: bg,
-      appBar: AppBar(
-        backgroundColor: bg,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Safe Route'),
-      ),
-      body: AnimatedBuilder(
-        animation: _viewModel,
-        builder: (context, child) {
-          if (_viewModel.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: teal),
-            );
-          }
+      foregroundColor: Colors.white,
+      elevation: 0,
+      title: const Text('Safe Route'),
+    ),
+    body: AnimatedBuilder(
+      animation: _viewModel,
+      builder: (context, child) {
+        final routes = _viewModel.routes;
+        final selected = _viewModel.selectedRoute;
 
-          if (_viewModel.errorMessage != null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _viewModel.errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _viewModel.loadRoutes,
-                      child: const Text('Retry'),
-                    ),
-                  ],
+        final routePoints = selected?.coordinates
+                .map((point) => LatLng(point[0], point[1]))
+                .toList() ??
+            <LatLng>[];
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildDestinationSearch(),
+            const SizedBox(height: 16),
+
+            if (_viewModel.isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(color: teal),
                 ),
               ),
-            );
-          }
 
-          final routes = _viewModel.routes;
-          final selected = _viewModel.selectedRoute;
-
-          if (routes.isEmpty || selected == null) {
-            return const Center(
-              child: Text(
-                'No routes available',
-                style: TextStyle(color: Colors.white),
+            if (_viewModel.errorMessage != null)
+              Text(
+                _viewModel.errorMessage!,
+                style: const TextStyle(color: coral),
               ),
-            );
-          }
 
-          final routePoints = selected.coordinates
-              .map((point) => LatLng(point[0], point[1]))
-              .toList();
+            if (!_viewModel.isLoading &&
+                routes.isEmpty &&
+                _selectedDestination == null)
+              const Text(
+                'Search and select a destination to find a route.',
+                style: TextStyle(color: muted),
+              ),
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+            if (routes.isNotEmpty && selected != null) ...[
               const Text(
                 'Route options',
                 style: TextStyle(
@@ -404,12 +685,8 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Hirapur Bus Stand → Bank More',
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
               const SizedBox(height: 16),
+
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -429,104 +706,40 @@ class _SafeRoutePageState extends State<SafeRoutePage> {
                   );
                 }).toList(),
               ),
+
               const SizedBox(height: 12),
+
               RouteMapCard(
                 fastest: false,
                 points: routePoints,
               ),
+
               const SizedBox(height: 12),
 
-              // Route details and hardcoded presentation-only score.
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: panel,
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(color: const Color(0xFF493263)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${selected.durationMinutes} min · '
-                      '${selected.distanceKm.toStringAsFixed(2)} km',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      selected.description,
-                      style: const TextStyle(color: muted, fontSize: 11),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Safety score: 85/100',
-                      style: TextStyle(
-                        color: teal,
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: const LinearProgressIndicator(
-                        value: 0.85,
-                        minHeight: 8,
-                        backgroundColor: Color(0xFF493263),
-                        valueColor: AlwaysStoppedAnimation<Color>(teal),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Demo score for presentation only. '
-                      'Not based on verified safety data.',
-                      style: TextStyle(color: muted, fontSize: 11),
-                    ),
-                  ],
+              Text(
+                '${selected.durationMinutes} min · '
+                '${selected.distanceKm.toStringAsFixed(2)} km',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildNearbyPlaces(),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => _showMessage(
-                  'Live location sharing is not implemented yet.',
-                ),
-                icon: const Icon(Icons.share_location_rounded),
-                label: const Text('Start live share'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: teal,
-                  foregroundColor: bg,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _showMessage(
-                  'Reporting is not connected yet.',
-                ),
-                icon: const Icon(Icons.flag_outlined),
-                label: const Text('Report'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: coral,
-                  side: const BorderSide(color: coral),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Estimated driving route · Not emergency navigation',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: muted, fontSize: 10),
+
+              const SizedBox(height: 6),
+              Text(
+                selected.description,
+                style: const TextStyle(color: muted),
               ),
             ],
-          );
-        },
-      ),
-    );
-  }
+
+            const SizedBox(height: 16),
+            _buildNearbyPlaces(),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 }

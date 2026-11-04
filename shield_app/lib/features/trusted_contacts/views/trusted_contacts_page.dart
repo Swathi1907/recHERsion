@@ -8,7 +8,7 @@ import '../repositories/api_trusted_contacts_repository.dart';
 class TrustedContactsPage extends StatefulWidget {
   const TrustedContactsPage({super.key});
 
-  static const baseUrl = 'http://172.22.21.45:3000';
+  static const baseUrl = 'http://172.22.21.254:3000';
 
   @override
   State<TrustedContactsPage> createState() => _TrustedContactsPageState();

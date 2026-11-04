@@ -27,3 +27,40 @@ export async function getRoutesController(req: Request, res: Response) {
 
   res.json(result);
 }
+export async function searchDestinationsController(
+  req: Request,
+  res: Response
+) {
+  const query = z.object({
+    query: z.string().trim().min(3).max(150)
+  }).parse(req.query);
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+
+  url.searchParams.set("q", query.query);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "6");
+  url.searchParams.set("addressdetails", "1");
+
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "SHIELD-SafetyApp/1.0"
+    }
+  });
+
+  if (!response.ok) {
+    res.status(502).json({ error: "Destination search failed." });
+    return;
+  }
+
+  const results = await response.json();
+
+  res.json({
+    destinations: results.map((place: any) => ({
+      name: place.name || place.display_name,
+      address: place.display_name,
+      latitude: Number(place.lat),
+      longitude: Number(place.lon)
+    }))
+  });
+}
